@@ -2,12 +2,16 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import pandas as pd
 import numpy as np
+import time
+import logging
 
 from .portfolio import Portfolio
 from .types import Order, OrderSide, BacktestResult
 from .costs import CostModel, ZeroCostModel
 from strategies.base import BaseStrategy
 from data.base import BaseDataLoader
+
+logger = logging.getLogger(__name__)
 
 
 class BacktestEngine:
@@ -19,7 +23,10 @@ class BacktestEngine:
                  initial_capital: float = 10000,
                  commission: float = 0.001,
                  position_size: float = 1.0,
-                 cost_model: Optional[CostModel] = None):
+                 cost_model: Optional[CostModel] = None,
+                 save_to_db: bool = False,
+                 db_manager=None,
+                 repository=None):
         """
         Initialize the backtesting engine.
 
@@ -28,12 +35,18 @@ class BacktestEngine:
             commission: Commission rate (as decimal, e.g., 0.001 = 0.1%)
             position_size: Fraction of capital to risk per trade (0.0 to 1.0)
             cost_model: Cost model for transaction costs (if None, uses ZeroCostModel)
+            save_to_db: Whether to save results to database
+            db_manager: Database manager instance
+            repository: Database repository instance
         """
         self.initial_capital = initial_capital
         self.commission = commission
         self.position_size = position_size
         self.cost_model = cost_model if cost_model else ZeroCostModel()
         self.portfolio = Portfolio(initial_capital, cost_model=self.cost_model, commission=commission)
+        self.save_to_db = save_to_db
+        self.db_manager = db_manager
+        self.repository = repository
         
     def run_backtest(self, 
                     data_loader: BaseDataLoader,
@@ -54,26 +67,38 @@ class BacktestEngine:
         Returns:
             BacktestResult with complete results
         """
+        start_time = time.time()
         print(f"Running backtest for {symbol} from {start_date} to {end_date}")
         print(f"Strategy: {strategy}")
         print(f"Initial Capital: ${self.initial_capital:,.2f}")
-        
+
         # Load data
         data = data_loader.load_data(symbol, start_date, end_date)
         if data.empty:
             raise ValueError("No data loaded for backtest")
-        
+
         # Generate signals
         print(f"Generating signals...")
         signals_data = strategy.generate_signals(data)
-        
+
         # Run simulation
         print(f"Running simulation...")
         self._simulate_trades(signals_data, symbol)
-        
+
         # Calculate results
+        run_duration = time.time() - start_time
         result = self._calculate_results(strategy, symbol, start_date, end_date)
-        
+
+        # Save to database if enabled
+        if self.save_to_db and self.repository:
+            try:
+                self._save_to_database(strategy, symbol, start_date, end_date,
+                                     data_loader.__class__.__name__, run_duration, result)
+                print("Results saved to database")
+            except Exception as e:
+                logger.error(f"Failed to save to database: {e}")
+                print(f"Warning: Failed to save to database: {e}")
+
         print(f"Backtest completed!")
         return result
     
@@ -266,3 +291,128 @@ class BacktestEngine:
                 winning_trades += 1
         
         return winning_trades / total_pairs if total_pairs > 0 else 0
+
+    def _save_to_database(self, strategy, symbol: str, start_date: str,
+                         end_date: str, data_source: str, run_duration: float,
+                         result: BacktestResult):
+        """Save backtest results to database."""
+        from database.models import (
+            Strategy as StrategyModel,
+            BacktestRun,
+            BacktestResultModel,
+            TradeModel,
+            DailyPerformance
+        )
+
+        # Save strategy
+        strategy_model = StrategyModel(
+            name=str(strategy),
+            strategy_type=strategy.__class__.__name__,
+            parameters=strategy.parameters,
+            description=strategy.get_description() if hasattr(strategy, 'get_description') else None
+        )
+        strategy_id = self.repository.save_strategy(strategy_model)
+
+        # Save backtest run
+        cost_model_info = {
+            'type': self.cost_model.__class__.__name__,
+            'commission': self.commission
+        }
+        if hasattr(self.cost_model, '__dict__'):
+            cost_model_info.update(self.cost_model.__dict__)
+
+        run = BacktestRun(
+            strategy_id=strategy_id,
+            symbol=symbol,
+            start_date=datetime.strptime(start_date, '%Y-%m-%d').date(),
+            end_date=datetime.strptime(end_date, '%Y-%m-%d').date(),
+            initial_capital=self.initial_capital,
+            data_source=data_source,
+            cost_model=cost_model_info,
+            run_duration_seconds=run_duration,
+            status='completed'
+        )
+        run_id = self.repository.save_backtest_run(run)
+
+        # Calculate additional metrics
+        trades_df = self.portfolio.get_trades_df()
+        winning_trades = 0
+        losing_trades = 0
+        total_wins = 0
+        total_losses = 0
+
+        if not trades_df.empty:
+            # Pair buy and sell trades to calculate PnL
+            buy_trades = trades_df[trades_df['side'] == 'BUY']
+            sell_trades = trades_df[trades_df['side'] == 'SELL']
+
+            for i in range(min(len(buy_trades), len(sell_trades))):
+                buy_price = buy_trades.iloc[i]['price']
+                sell_price = sell_trades.iloc[i]['price']
+                quantity = buy_trades.iloc[i]['quantity']
+
+                pnl = (sell_price - buy_price) * quantity
+                if pnl > 0:
+                    winning_trades += 1
+                    total_wins += pnl
+                else:
+                    losing_trades += 1
+                    total_losses += abs(pnl)
+
+        # Save backtest result
+        result_model = BacktestResultModel(
+            run_id=run_id,
+            final_value=result.final_value,
+            total_return=result.total_return,
+            annualized_return=result.annualized_return,
+            sharpe_ratio=result.sharpe_ratio if not pd.isna(result.sharpe_ratio) else None,
+            max_drawdown=result.max_drawdown,
+            win_rate=result.win_rate,
+            num_trades=result.num_trades,
+            num_winning_trades=winning_trades,
+            num_losing_trades=losing_trades,
+            total_commission=result.total_commission,
+            total_slippage=result.total_slippage,
+            total_spread_cost=result.total_spread_cost,
+            total_transaction_costs=result.total_transaction_costs,
+            avg_win=total_wins / winning_trades if winning_trades > 0 else None,
+            avg_loss=total_losses / losing_trades if losing_trades > 0 else None
+        )
+        self.repository.save_backtest_result(result_model)
+
+        # Save trades
+        if result.trades:
+            trade_models = []
+            for trade in result.trades:
+                trade_model = TradeModel(
+                    run_id=run_id,
+                    trade_date=trade.timestamp,
+                    action=trade.side.value,
+                    symbol=trade.symbol,
+                    quantity=trade.quantity,
+                    price=trade.price,
+                    commission=trade.commission,
+                    slippage=trade.slippage,
+                    spread_cost=trade.spread_cost,
+                    total_cost=trade.total_cost,
+                    trade_value=trade.value,
+                    cash_after=self.portfolio.cash  # Current cash after trade
+                )
+                trade_models.append(trade_model)
+            self.repository.save_trades(trade_models)
+
+        # Save daily performance
+        if result.portfolio_values:
+            perf_models = []
+            for pv in result.portfolio_values:
+                perf_model = DailyPerformance(
+                    run_id=run_id,
+                    date=pv['timestamp'].date() if isinstance(pv['timestamp'], datetime) else pv['timestamp'],
+                    portfolio_value=pv['total_value'],
+                    cash=pv.get('cash'),
+                    positions_value=pv.get('positions_value'),
+                    daily_return=pv.get('return'),
+                    num_positions=len(self.portfolio.positions)
+                )
+                perf_models.append(perf_model)
+            self.repository.save_daily_performance(perf_models)
