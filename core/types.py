@@ -47,6 +47,15 @@ class Position:
 
 
 @dataclass
+class CostStructure:
+    """Breakdown of transaction costs."""
+    commission: float
+    slippage: float
+    spread_cost: float
+    total_cost: float
+
+
+@dataclass
 class Trade:
     symbol: str
     side: OrderSide
@@ -55,7 +64,10 @@ class Trade:
     timestamp: datetime
     trade_id: Optional[str] = None
     commission: float = 0.0
-    
+    slippage: float = 0.0
+    spread_cost: float = 0.0
+    total_cost: float = 0.0
+
     @property
     def value(self) -> float:
         return self.quantity * self.price
@@ -73,4 +85,8 @@ class BacktestResult:
     win_rate: float
     trades: list
     portfolio_values: list
-    metadata: Dict[str, Any]
+    total_commission: float = 0.0
+    total_slippage: float = 0.0
+    total_spread_cost: float = 0.0
+    total_transaction_costs: float = 0.0
+    metadata: Dict[str, Any] = None

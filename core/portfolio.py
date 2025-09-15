@@ -3,6 +3,7 @@ from datetime import datetime
 import pandas as pd
 
 from .types import Order, Position, Trade, OrderSide, OrderStatus
+from .costs import CostModel, ZeroCostModel
 
 
 class Portfolio:
@@ -10,14 +11,21 @@ class Portfolio:
     Portfolio class that manages cash, positions, and trade execution.
     """
     
-    def __init__(self, initial_capital: float, commission: float = 0.001):
+    def __init__(self, initial_capital: float, cost_model: Optional[CostModel] = None, commission: float = 0.001):
         self.initial_capital = initial_capital
         self.cash = initial_capital
-        self.commission = commission
+        self.cost_model = cost_model if cost_model else ZeroCostModel()
+        self.commission = commission  # Keep for backward compatibility
         self.positions: Dict[str, Position] = {}
         self.trades: List[Trade] = []
         self.portfolio_values: List[Dict] = []
         self._trade_id_counter = 0
+        self.cumulative_costs = {
+            'commission': 0.0,
+            'slippage': 0.0,
+            'spread': 0.0,
+            'total': 0.0
+        }
     
     @property
     def total_value(self) -> float:
@@ -36,59 +44,90 @@ class Portfolio:
             if symbol in self.positions:
                 self.positions[symbol].current_price = price
     
-    def can_execute_order(self, order: Order, current_price: float) -> bool:
+    def can_execute_order(self, order: Order, current_price: float, volume: Optional[float] = None) -> bool:
         """Check if an order can be executed."""
         if order.side == OrderSide.BUY:
-            required_cash = order.quantity * current_price * (1 + self.commission)
+            # Calculate costs to check if we have enough cash
+            costs = self.cost_model.calculate_costs(
+                side=order.side,
+                quantity=order.quantity,
+                price=current_price,
+                volume=volume
+            )
+            required_cash = (order.quantity * current_price) + costs.total_cost
             return self.cash >= required_cash
         else:  # SELL
             position = self.positions.get(order.symbol)
             return position is not None and position.quantity >= order.quantity
     
-    def execute_order(self, order: Order, current_price: float, timestamp: datetime) -> Optional[Trade]:
+    def execute_order(self, order: Order, current_price: float, timestamp: datetime, volume: Optional[float] = None) -> Optional[Trade]:
         """
         Execute an order and update portfolio state.
-        
+
         Args:
             order: Order to execute
             current_price: Current market price
             timestamp: Execution timestamp
-            
+            volume: Average daily volume for slippage calculation
+
         Returns:
             Trade object if executed, None if execution failed
         """
-        if not self.can_execute_order(order, current_price):
+        if not self.can_execute_order(order, current_price, volume):
             return None
-        
-        # Calculate commission
-        commission = order.quantity * current_price * self.commission
-        
+
+        # Calculate transaction costs
+        costs = self.cost_model.calculate_costs(
+            side=order.side,
+            quantity=order.quantity,
+            price=current_price,
+            volume=volume
+        )
+
+        # Adjust execution price for slippage
+        if order.side == OrderSide.BUY:
+            # Buy at higher price due to slippage
+            execution_price = current_price * (1 + costs.slippage / (order.quantity * current_price))
+        else:
+            # Sell at lower price due to slippage
+            execution_price = current_price * (1 - costs.slippage / (order.quantity * current_price))
+
         # Create trade
         trade = Trade(
             symbol=order.symbol,
             side=order.side,
             quantity=order.quantity,
-            price=current_price,
+            price=execution_price,
             timestamp=timestamp,
             trade_id=str(self._trade_id_counter),
-            commission=commission
+            commission=costs.commission,
+            slippage=costs.slippage,
+            spread_cost=costs.spread_cost,
+            total_cost=costs.total_cost
         )
         self._trade_id_counter += 1
-        
+
+        # Update cumulative costs
+        self.cumulative_costs['commission'] += costs.commission
+        self.cumulative_costs['slippage'] += costs.slippage
+        self.cumulative_costs['spread'] += costs.spread_cost
+        self.cumulative_costs['total'] += costs.total_cost
+
         # Update portfolio
         if order.side == OrderSide.BUY:
-            self._execute_buy(trade)
+            self._execute_buy(trade, costs)
         else:
-            self._execute_sell(trade)
-        
+            self._execute_sell(trade, costs)
+
         self.trades.append(trade)
         order.status = OrderStatus.FILLED
-        
+
         return trade
     
-    def _execute_buy(self, trade: Trade) -> None:
+    def _execute_buy(self, trade: Trade, costs) -> None:
         """Execute a buy order."""
-        total_cost = trade.value + trade.commission
+        # Total cost includes trade value plus all transaction costs
+        total_cost = trade.value + costs.total_cost
         self.cash -= total_cost
         
         if trade.symbol in self.positions:
@@ -107,9 +146,10 @@ class Portfolio:
                 current_price=trade.price
             )
     
-    def _execute_sell(self, trade: Trade) -> None:
+    def _execute_sell(self, trade: Trade, costs) -> None:
         """Execute a sell order."""
-        total_proceeds = trade.value - trade.commission
+        # Total proceeds is trade value minus all transaction costs
+        total_proceeds = trade.value - costs.total_cost
         self.cash += total_proceeds
         
         if trade.symbol in self.positions:
@@ -143,7 +183,8 @@ class Portfolio:
             'total_value': self.total_value,
             'total_return': self.total_return,
             'num_positions': len(self.positions),
-            'num_trades': len(self.trades)
+            'num_trades': len(self.trades),
+            'cumulative_costs': self.cumulative_costs
         }
     
     def get_trades_df(self) -> pd.DataFrame:
@@ -160,7 +201,10 @@ class Portfolio:
                 'quantity': trade.quantity,
                 'price': trade.price,
                 'value': trade.value,
-                'commission': trade.commission
+                'commission': trade.commission,
+                'slippage': trade.slippage,
+                'spread_cost': trade.spread_cost,
+                'total_cost': trade.total_cost
             })
         
         return pd.DataFrame(trades_data)

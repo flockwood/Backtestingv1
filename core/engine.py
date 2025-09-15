@@ -5,6 +5,7 @@ import numpy as np
 
 from .portfolio import Portfolio
 from .types import Order, OrderSide, BacktestResult
+from .costs import CostModel, ZeroCostModel
 from strategies.base import BaseStrategy
 from data.base import BaseDataLoader
 
@@ -14,22 +15,25 @@ class BacktestEngine:
     Backtesting engine that orchestrates the entire simulation.
     """
     
-    def __init__(self, 
+    def __init__(self,
                  initial_capital: float = 10000,
                  commission: float = 0.001,
-                 position_size: float = 1.0):
+                 position_size: float = 1.0,
+                 cost_model: Optional[CostModel] = None):
         """
         Initialize the backtesting engine.
-        
+
         Args:
             initial_capital: Starting capital
             commission: Commission rate (as decimal, e.g., 0.001 = 0.1%)
             position_size: Fraction of capital to risk per trade (0.0 to 1.0)
+            cost_model: Cost model for transaction costs (if None, uses ZeroCostModel)
         """
         self.initial_capital = initial_capital
         self.commission = commission
         self.position_size = position_size
-        self.portfolio = Portfolio(initial_capital, commission)
+        self.cost_model = cost_model if cost_model else ZeroCostModel()
+        self.portfolio = Portfolio(initial_capital, cost_model=self.cost_model, commission=commission)
         
     def run_backtest(self, 
                     data_loader: BaseDataLoader,
@@ -76,39 +80,50 @@ class BacktestEngine:
     def _simulate_trades(self, data: pd.DataFrame, symbol: str) -> None:
         """
         Simulate trading based on signals.
-        
+
         Args:
             data: DataFrame with price data and signals
             symbol: Stock symbol being traded
         """
         current_position = 0  # 0 = no position, 1 = long position
-        
-        for i, (timestamp, row) in enumerate(data.iterrows()):
+
+        for timestamp, row in data.iterrows():
             current_price = row['Close']
             position_change = row.get('Position', 0)
-            
+            volume = row.get('Volume', None)  # Get volume data for slippage calculation
+
             # Record portfolio value
             self.portfolio.record_portfolio_value(
                 timestamp, {symbol: current_price}
             )
-            
+
             # Handle position changes
             if position_change == 1 and current_position == 0:
                 # Enter long position
-                self._enter_long_position(symbol, current_price, timestamp)
+                self._enter_long_position(symbol, current_price, timestamp, volume)
                 current_position = 1
-                
+
             elif position_change == -1 and current_position == 1:
                 # Exit long position
-                self._exit_long_position(symbol, current_price, timestamp)
+                self._exit_long_position(symbol, current_price, timestamp, volume)
                 current_position = 0
     
-    def _enter_long_position(self, symbol: str, price: float, timestamp: datetime) -> None:
+    def _enter_long_position(self, symbol: str, price: float, timestamp: datetime, volume: Optional[float] = None) -> None:
         """Enter a long position."""
         # Calculate position size based on available cash
+        # First estimate costs to adjust position size
+        test_quantity = self.portfolio.cash * self.position_size / price
+        costs = self.cost_model.calculate_costs(
+            side=OrderSide.BUY,
+            quantity=test_quantity,
+            price=price,
+            volume=volume
+        )
+
+        # Adjust for total costs
         available_cash = self.portfolio.cash * self.position_size
-        quantity = available_cash / (price * (1 + self.commission))
-        
+        quantity = available_cash / (price + costs.total_cost / test_quantity)
+
         if quantity > 0:
             order = Order(
                 symbol=symbol,
@@ -116,12 +131,12 @@ class BacktestEngine:
                 quantity=quantity,
                 timestamp=timestamp
             )
-            
-            trade = self.portfolio.execute_order(order, price, timestamp)
+
+            trade = self.portfolio.execute_order(order, price, timestamp, volume)
             if trade:
-                print(f"  BUY: {trade.quantity:.2f} shares at ${trade.price:.2f}")
+                print(f"  BUY: {trade.quantity:.2f} shares at ${trade.price:.2f} (costs: ${trade.total_cost:.2f})")
     
-    def _exit_long_position(self, symbol: str, price: float, timestamp: datetime) -> None:
+    def _exit_long_position(self, symbol: str, price: float, timestamp: datetime, volume: Optional[float] = None) -> None:
         """Exit a long position."""
         position = self.portfolio.positions.get(symbol)
         if position and position.quantity > 0:
@@ -131,10 +146,10 @@ class BacktestEngine:
                 quantity=position.quantity,
                 timestamp=timestamp
             )
-            
-            trade = self.portfolio.execute_order(order, price, timestamp)
+
+            trade = self.portfolio.execute_order(order, price, timestamp, volume)
             if trade:
-                print(f"  SELL: {trade.quantity:.2f} shares at ${trade.price:.2f}")
+                print(f"  SELL: {trade.quantity:.2f} shares at ${trade.price:.2f} (costs: ${trade.total_cost:.2f})")
     
     def _calculate_results(self, 
                           strategy: BaseStrategy,
@@ -163,7 +178,10 @@ class BacktestEngine:
         # Trade analysis
         trades_df = self.portfolio.get_trades_df()
         win_rate = self._calculate_win_rate(trades_df) if not trades_df.empty else 0
-        
+
+        # Get cumulative costs
+        cumulative_costs = self.portfolio.cumulative_costs
+
         return BacktestResult(
             initial_capital=self.initial_capital,
             final_value=final_value,
@@ -175,12 +193,17 @@ class BacktestEngine:
             win_rate=win_rate,
             trades=self.portfolio.trades,
             portfolio_values=self.portfolio.portfolio_values,
+            total_commission=cumulative_costs['commission'],
+            total_slippage=cumulative_costs['slippage'],
+            total_spread_cost=cumulative_costs['spread'],
+            total_transaction_costs=cumulative_costs['total'],
             metadata={
                 'symbol': symbol,
                 'strategy': str(strategy),
                 'start_date': start_date,
                 'end_date': end_date,
-                'commission': self.commission
+                'commission': self.commission,
+                'cost_model': str(self.cost_model.__class__.__name__)
             }
         )
     

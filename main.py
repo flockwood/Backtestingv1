@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from data import AlpacaDataLoader, CSVDataLoader
 from strategies import SMAStrategy
 from core import BacktestEngine
+from core.costs import SimpleCostModel
 from analysis import PerformanceAnalyzer
 
 
@@ -49,19 +50,35 @@ def main():
         strategy = SMAStrategy(short_window=10, long_window=20)
         print(f"✓ {strategy}")
         print(f"  {strategy.get_description()}")
-        
-        # 3. Initialize Backtesting Engine
+
+        # 3. Initialize Cost Model
+        print("Initializing cost model...")
+        cost_model = SimpleCostModel(
+            fixed_fee=0,
+            percentage_fee=0.001,  # 0.1%
+            base_slippage_bps=5,
+            market_impact_coefficient=10,
+            bid_ask_spread_bps=10
+        )
+        print(f"✓ Cost Model: SimpleCostModel")
+        print(f"  - Commission: 0.1%")
+        print(f"  - Base slippage: 5 bps")
+        print(f"  - Market impact: 10 bps")
+        print(f"  - Bid-ask spread: 10 bps")
+
+        # 4. Initialize Backtesting Engine
         print("Initializing backtest engine...")
         engine = BacktestEngine(
             initial_capital=initial_capital,
             commission=commission,
-            position_size=position_size
+            position_size=position_size,
+            cost_model=cost_model
         )
-        print(f"✓ Backtest Engine ready")
+        print(f"✓ Backtest Engine ready with transaction cost modeling")
         
         print("-" * 60)
-        
-        # 4. Run Backtest
+
+        # 5. Run Backtest
         print("Starting backtest...")
         result = engine.run_backtest(
             data_loader=data_loader,
@@ -70,11 +87,22 @@ def main():
             start_date=start_date,
             end_date=end_date
         )
-        
-        # 5. Display Results
+
+        # 6. Display Results
         PerformanceAnalyzer.print_results(result)
         PerformanceAnalyzer.print_trade_summary(result)
         PerformanceAnalyzer.print_detailed_analysis(result)
+
+        # 7. Display Transaction Cost Analysis
+        print("\n" + "="*60)
+        print("TRANSACTION COST ANALYSIS")
+        print("="*60)
+        print(f"Total Commission:    ${result.total_commission:>12,.2f}")
+        print(f"Total Slippage:      ${result.total_slippage:>12,.2f}")
+        print(f"Total Spread Cost:   ${result.total_spread_cost:>12,.2f}")
+        print("-" * 60)
+        print(f"Total Trading Costs: ${result.total_transaction_costs:>12,.2f}")
+        print(f"% of Initial Capital: {result.total_transaction_costs/initial_capital:>11.2%}")
         
     except Exception as e:
         print(f"❌ Error during backtest: {e}")
