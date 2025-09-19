@@ -1,0 +1,5 @@
+scenario,total_return,sharpe_ratio,num_trades,total_costs,cost_percentage
+Zero Costs,2.48%,-2.08,7,$0.00,0.00%
+Low Costs,2.19%,-1.31,7,$20.83,0.21%
+Realistic Costs,0.70%,1.35,7,$137.88,1.38%
+High Costs,-3.10%,-0.34,7,$473.55,4.74%

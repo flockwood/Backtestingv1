@@ -1,0 +1,9 @@
+strategy,return,sharpe,max_dd,trades,win_rate,costs
+"Bollinger Bands({'period': 20, 'num_std': 2, 'strategy_type': 'breakout'})",0.03554132363303579,3.464010641430367,-0.053953027049890315,4,1.0,77.16770308232331
+"Bollinger Bands({'period': 20, 'num_std': 2, 'strategy_type': 'mean_reversion'})",0.04605562271221807,2.8416122421779733,-0.002381919193671543,2,1.0,38.942629287188254
+"SMA Crossover({'short_window': 20, 'long_window': 50})",0.08862958131823709,2.499783231024384,-0.07077637081055946,3,0.0,55.80125449340328
+"SMA Crossover({'short_window': 10, 'long_window': 20})",0.0067595804609271,1.3595160575051535,-0.07610443390853561,7,0.3333333333333333,131.04950675900582
+"RSI Strategy({'period': 14, 'oversold': 20, 'overbought': 80, 'use_signal_line': False})",0.0,0.0,0.0,0,0.0,0.0
+"RSI Strategy({'period': 14, 'oversold': 30, 'overbought': 70, 'use_signal_line': False})",0.0,0.0,0.0,0,0.0,0.0
+"MACD Strategy({'fast_period': 12, 'slow_period': 26, 'signal_period': 9, 'use_histogram': False})",-0.015418460490878715,-0.9352304657343399,-0.07717767194770936,8,0.5,152.5411558355254
+"MACD Strategy({'fast_period': 12, 'slow_period': 26, 'signal_period': 9, 'use_histogram': True})",-0.015418460490878715,-0.9352304657343399,-0.07717767194770936,8,0.5,152.5411558355254

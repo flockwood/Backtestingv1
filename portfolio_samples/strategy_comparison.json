@@ -1,0 +1,125 @@
+[
+  {
+    "symbol": "AAPL",
+    "results": [
+      {
+        "strategy": "Conservative",
+        "parameters": "SMA(20/50)",
+        "total_return": 0.0,
+        "annualized_return": 0.0,
+        "sharpe_ratio": 0,
+        "sortino_ratio": -15.874507866387537,
+        "max_drawdown": 0.0,
+        "num_trades": 0,
+        "win_rate": 0,
+        "total_costs": 0.0
+      },
+      {
+        "strategy": "Moderate",
+        "parameters": "SMA(10/30)",
+        "total_return": 0.038113661101353134,
+        "annualized_return": 0.16591798032818939,
+        "sharpe_ratio": -3.5509175124858743,
+        "sortino_ratio": 1.459607573394569,
+        "max_drawdown": -0.05158836613421728,
+        "num_trades": 1,
+        "win_rate": 0,
+        "total_costs": 14.702213292154026
+      },
+      {
+        "strategy": "Aggressive",
+        "parameters": "SMA(5/15)",
+        "total_return": -0.0008000445601515821,
+        "annualized_return": 0.0027572812374143663,
+        "sharpe_ratio": -4.893478975145908,
+        "sortino_ratio": -0.089931813839082,
+        "max_drawdown": -0.051558423737239116,
+        "num_trades": 5,
+        "win_rate": 0.5,
+        "total_costs": 73.53211128373198
+      }
+    ]
+  },
+  {
+    "symbol": "MSFT",
+    "results": [
+      {
+        "strategy": "Conservative",
+        "parameters": "SMA(20/50)",
+        "total_return": 0.0,
+        "annualized_return": 0.0,
+        "sharpe_ratio": 0,
+        "sortino_ratio": -15.874507866387537,
+        "max_drawdown": 0.0,
+        "num_trades": 0,
+        "win_rate": 0,
+        "total_costs": 0.0
+      },
+      {
+        "strategy": "Moderate",
+        "parameters": "SMA(10/30)",
+        "total_return": 0.0,
+        "annualized_return": 0.0,
+        "sharpe_ratio": 0,
+        "sortino_ratio": -15.874507866387537,
+        "max_drawdown": 0.0,
+        "num_trades": 0,
+        "win_rate": 0,
+        "total_costs": 0.0
+      },
+      {
+        "strategy": "Aggressive",
+        "parameters": "SMA(5/15)",
+        "total_return": -0.011583151599353914,
+        "annualized_return": -0.0466888458526491,
+        "sharpe_ratio": 0,
+        "sortino_ratio": -2.452438345418056,
+        "max_drawdown": -0.013386860041543696,
+        "num_trades": 1,
+        "win_rate": 0,
+        "total_costs": 14.702216655773917
+      }
+    ]
+  },
+  {
+    "symbol": "GOOGL",
+    "results": [
+      {
+        "strategy": "Conservative",
+        "parameters": "SMA(20/50)",
+        "total_return": 0.0,
+        "annualized_return": 0.0,
+        "sharpe_ratio": 0,
+        "sortino_ratio": -15.874507866387537,
+        "max_drawdown": 0.0,
+        "num_trades": 0,
+        "win_rate": 0,
+        "total_costs": 0.0
+      },
+      {
+        "strategy": "Moderate",
+        "parameters": "SMA(10/30)",
+        "total_return": 0.0,
+        "annualized_return": 0.0,
+        "sharpe_ratio": 0,
+        "sortino_ratio": -15.874507866387537,
+        "max_drawdown": 0.0,
+        "num_trades": 0,
+        "win_rate": 0,
+        "total_costs": 0.0
+      },
+      {
+        "strategy": "Aggressive",
+        "parameters": "SMA(5/15)",
+        "total_return": 0.0,
+        "annualized_return": 0.0,
+        "sharpe_ratio": 0,
+        "sortino_ratio": -15.874507866387537,
+        "max_drawdown": 0.0,
+        "num_trades": 0,
+        "win_rate": 0,
+        "total_costs": 0.0
+      }
+    ]
+  }
+]

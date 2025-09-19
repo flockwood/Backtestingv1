@@ -1,0 +1,86 @@
+{
+  "basic_metrics": {
+    "initial_capital": 25000,
+    "final_value": 25907.578957722973,
+    "total_return": 0.036303158308918934,
+    "annualized_return": 0.07636105421674144,
+    "sharpe_ratio": -3.965362108004206,
+    "max_drawdown": -0.053304432596625845,
+    "num_trades": 3,
+    "win_rate": 1.0
+  },
+  "transaction_costs": {
+    "total_commission": 71.17126578462091,
+    "total_slippage": 35.585717753457786,
+    "total_spread_cost": 35.58563289231046,
+    "total_transaction_costs": 142.34261643038914
+  },
+  "risk_metrics": {
+    "sortino_ratio": 0.6819223381145383,
+    "calmar_ratio": 1.4325460472413898,
+    "var_95": 0.011423829703675637,
+    "var_99": 0.02268995998695518,
+    "cvar_95": 0.018159087513346574,
+    "cvar_99": 0.02721258558477041,
+    "downside_deviation": 0.17432921591925205,
+    "omega_ratio": 1.1928957968746134,
+    "ulcer_index": 1.3337374255257954,
+    "tail_ratio": 1.2014787326746261,
+    "max_drawdown": -0.053304432596625845,
+    "max_drawdown_duration": 0,
+    "recovery_time": 0,
+    "start_date": "2025-08-01 04:00:00+00:00",
+    "end_date": "2025-08-01 04:00:00+00:00",
+    "recovery_date": "2025-08-01 04:00:00+00:00"
+  },
+  "trade_analytics": {
+    "risk_reward": {
+      "avg_win": 0,
+      "avg_loss": 28.364804608088406,
+      "win_rate": 0.0,
+      "loss_rate": 1.0,
+      "profit_factor": 0.0,
+      "risk_reward_ratio": 0.0,
+      "expectancy": -28.364804608088406,
+      "kelly_percentage": 0,
+      "gross_profit": 0,
+      "gross_loss": 28.364804608088406,
+      "largest_win": 0,
+      "largest_loss": -28.364804608088406
+    },
+    "win_loss_streaks": {
+      "max_winning_streak": 0,
+      "max_losing_streak": 1,
+      "current_streak": 1,
+      "current_streak_type": "loss",
+      "avg_winning_streak": 0,
+      "avg_losing_streak": 1.0,
+      "num_winning_streaks": 0,
+      "num_losing_streaks": 1,
+      "streak_details": [
+        [
+          "False",
+          1
+        ]
+      ]
+    },
+    "holding_periods": {
+      "avg_holding_period_hours": 840.0,
+      "avg_holding_period_days": 35.0,
+      "avg_winning_holding_period": 0,
+      "avg_losing_holding_period": 840.0,
+      "median_holding_period_hours": 840.0,
+      "max_holding_period_hours": 840.0,
+      "min_holding_period_hours": 840.0
+    },
+    "slippage_analysis": {
+      "total_slippage": 35.585717753457786,
+      "avg_slippage_per_trade": 11.861905917819263,
+      "max_slippage": 11.896508972222147,
+      "avg_slippage_pct": 0.04999179835914351,
+      "small_trade_avg_slippage": 11.837872471426685,
+      "large_trade_avg_slippage": 11.87392264101555,
+      "slippage_impact_on_returns": 0.14234287101383114
+    }
+  }
+}
